@@ -8,12 +8,15 @@ import (
 type JobThatMayFail func() (interface{}, error)
 type BackoffFunc func(n int) int
 
+const BACKOFF_IMMEDIATE = func(i int) { return 0 }
+const BACKOFF_1_SECOND = func(i int) { return 1000 }
+
 // Returns a backoff func that sleeps 2^i exponentially with initial sleep of initial delay seconds
-func ExponentialBackoff(initialDelaySeconds int, maxSeconds int) BackoffFunc {
+func ExponentialBackoff(initialMS int, maxMS int) BackoffFunc {
   return func(i int) int {
-    to_sleep := int(math.Pow(2.0, float64(i))) * 1000 * initialDelaySeconds
-    if to_sleep > maxSeconds*1000 {
-      return maxSeconds * 1000
+    to_sleep := int(math.Pow(2.0, float64(i))) * initialDelaySeconds
+    if to_sleep > maxMS {
+      return maxMS
     } else {
       return to_sleep
     }
@@ -21,12 +24,11 @@ func ExponentialBackoff(initialDelaySeconds int, maxSeconds int) BackoffFunc {
 }
 
 // Returns a backoff func that sleeps fixed backoff seconds (by parameter seconds)
-func FixedBackoff(seconds int) BackoffFunc {
+func FixedBackoff(milliseconds int) BackoffFunc {
   return func(i int) int {
-    return seconds * 1000
+    return milliseconds
   }
 }
-
 
 // retry a job that may fail, up to nRetries, with backoff policy specified by BackoffFunc. Returns the job's result, nth try (0 if first try succeeded) and an error if after nRetries it still failed. The returned error will be the last error
 func Redo(f JobThatMayFail, nRetries int, backoffFunc BackoffFunc) (interface{}, int, error) {
@@ -38,7 +40,9 @@ func Redo(f JobThatMayFail, nRetries int, backoffFunc BackoffFunc) (interface{},
     if err != nil {
       if backoffFunc != nil {
         backoff := time.Duration(backoffFunc(i)) * time.Millisecond
-        time.Sleep(backoff)
+        if backoff > 0 {
+          time.Sleep(backoff)
+        }
       } else {
         // no backoff func provided, no sleeping
       }
@@ -47,5 +51,41 @@ func Redo(f JobThatMayFail, nRetries int, backoffFunc BackoffFunc) (interface{},
     }
   }
   return nil, i, err
+}
+
+// retry a job that may fail, up to nRetries, and sleep sleepms milliseconds between tries
+func RedoSleep(f JobThatMayFail, nRetries int, sleepms int) (interface{}, int, error) {
+  return Redo(f, nRetries, FixedBackoff(sleepms))
+}
+
+// retry a job that may fail, up to 3 times, without sleep
+func Redo3(f JobThatMayFail) (interface{}, int, error) {
+  return Redo(f, 3, nil)
+}
+
+// retry a job that may fail, up to 5 times, without sleep
+func Redo5(f JobThatMayFail) (interface{}, int, error) {
+  return Redo(f, 5, nil)
+}
+
+// retry a job that may fail, up to 10 times, without sleep
+func Redo10(f JobThatMayFail) (interface{}, int, error) {
+  return Redo(f, 10, nil)
+}
+
+// retry a job that may fail, up to 3 time, sleep sleepms milliseconds betweeen tries
+func RedoSleep3(f JobThatMayFail, sleepms int) {
+  return RedoSleep(f, 3, sleepms)
+}
+
+// retry a job that may fail, up to 5 time, sleep sleepms milliseconds betweeen tries
+func RedoSleep5(f JobThatMayFail, sleepms int) {
+  return RedoSleep(f, 5, sleepms)
+}
+
+// retry a job that may fail, up to 10 time, sleep sleepms milliseconds betweeen tries
+func RedoSleep10(f JobThatMayFail, sleepms int) {
+  return RedoSleep(f, 10, sleepms)
+
 }
 
