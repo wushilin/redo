@@ -8,13 +8,13 @@ import (
 type JobThatMayFail func() (interface{}, error)
 type BackoffFunc func(n int) int
 
-const BACKOFF_IMMEDIATE = func(i int) { return 0 }
-const BACKOFF_1_SECOND = func(i int) { return 1000 }
+var BACKOFF_IMMEDIATE = func(i int) int { return 0 }
+var BACKOFF_1_SECOND = func(i int) int { return 1000 }
 
 // Returns a backoff func that sleeps 2^i exponentially with initial sleep of initial delay seconds
 func ExponentialBackoff(initialMS int, maxMS int) BackoffFunc {
   return func(i int) int {
-    to_sleep := int(math.Pow(2.0, float64(i))) * initialDelaySeconds
+    to_sleep := int(math.Pow(2.0, float64(i))) * initialMS
     if to_sleep > maxMS {
       return maxMS
     } else {
@@ -74,17 +74,17 @@ func Redo10(f JobThatMayFail) (interface{}, int, error) {
 }
 
 // retry a job that may fail, up to 3 time, sleep sleepms milliseconds betweeen tries
-func RedoSleep3(f JobThatMayFail, sleepms int) {
+func RedoSleep3(f JobThatMayFail, sleepms int) (interface{}, int, error) {
   return RedoSleep(f, 3, sleepms)
 }
 
 // retry a job that may fail, up to 5 time, sleep sleepms milliseconds betweeen tries
-func RedoSleep5(f JobThatMayFail, sleepms int) {
+func RedoSleep5(f JobThatMayFail, sleepms int) (interface{}, int, error) {
   return RedoSleep(f, 5, sleepms)
 }
 
 // retry a job that may fail, up to 10 time, sleep sleepms milliseconds betweeen tries
-func RedoSleep10(f JobThatMayFail, sleepms int) {
+func RedoSleep10(f JobThatMayFail, sleepms int) (interface{}, int, error) {
   return RedoSleep(f, 10, sleepms)
 
 }
